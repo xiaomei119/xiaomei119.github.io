@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>爱心弹窗 - 修复版</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            position: relative;
+            overflow-x: hidden;
+            font-family: "Microsoft YaHei", "微软雅黑", sans-serif;
+        }
+
+        .message-card {
+            position: fixed;
+            background: white;
+            border-radius: 20px;
+            padding: 12px 22px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+            font-size: 16px;
+            font-weight: bold;
+            z-index: 1000;
+            white-space: nowrap;
+            cursor: pointer;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.8); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        .heart-container {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 100px;
+            opacity: 0;
+            transition: opacity 1s ease;
+            pointer-events: none;
+            z-index: 999;
+        }
+
+        .info-bar {
+            position: fixed;
+            bottom: 20px;
+            left: 0;
+            right: 0;
+            text-align: center;
+            color: white;
+            font-size: 14px;
+            background: rgba(0, 0, 0, 0.6);
+            padding: 10px;
+            z-index: 1001;
+        }
+    </style>
+</head>
+<body>
+<div class="heart-container" id="heartContainer">❤️</div>
+<div class="info-bar" id="infoBar">✨ 爱心绘制中... ✨</div>
+
+<script>
+    // 配置
+    const texts = ["好好吃饭", "好好爱自己", "保持好心情", "我想你了", "别熬夜", "多喝水哦~", "顺顺利利", "天冷了多穿衣服", "你真棒", "开心每一天"];
+    const colors = ["#FFB6C1", "#98FB98", "#87CEEB", "#F0E68C", "#DDA0DD", "#FFA07A", "#7FFFD4", "#FFC0CB", "#FFD966", "#B0C4DE"];
+    
+    let heartIndex = 0;
+    let heartPoints = [];
+    let isHeartDone = false;
+    let intervalId = null;
+
+    // 随机数
+    function random(min, max) {
+        return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+
+    // 计算心形轨迹
+    function calcHeartPoints() {
+        const points = [];
+        const cx = window.innerWidth / 2;
+        const cy = window.innerHeight / 2 - 60;
+        const scale = 35;
+        
+        for (let angle = 0; angle < 360; angle += 4) {
+            const t = angle * Math.PI / 180;
+            const x = cx + scale * (16 * Math.pow(Math.sin(t), 3));
+            const y = cy - scale * (13 * Math.cos(t) - 5 * Math.cos(2*t) - 2 * Math.cos(3*t) - Math.cos(4*t));
+            points.push({ x: Math.round(x), y: Math.round(y) });
+        }
+        return points;
+    }
+
+    // 创建一个弹窗
+    function createPopup(x, y, text, bgColor) {
+        const popup = document.createElement('div');
+        popup.className = 'message-card';
+        popup.textContent = text;
+        popup.style.backgroundColor = bgColor;
+        popup.style.left = x + 'px';
+        popup.style.top = y + 'px';
+        
+        // 点击关闭
+        popup.addEventListener('click', function() {
+            popup.remove();
+        });
+        
+        document.body.appendChild(popup);
+        
+        // 3秒后自动消失
+        setTimeout(() => {
+            if (popup.parentNode) popup.remove();
+        }, 3000);
+        
+        return popup;
+    }
+
+    // 随机弹窗（全屏任意位置）
+    function randomPopup() {
+        const x = random(20, window.innerWidth - 140);
+        const y = random(20, window.innerHeight - 80);
+        const text = texts[Math.floor(Math.random() * texts.length)];
+        const color = colors[Math.floor(Math.random() * colors.length)];
+        createPopup(x, y, text, color);
+    }
+
+    // 一次弹出多个
+    function burstPopups(count) {
+        console.log("弹出 " + count + " 个标签");
+        for (let i = 0; i < count; i++) {
+            randomPopup();
+        }
+    }
+
+    // 开始持续弹窗
+    function startFloating() {
+        // 先弹20个
+        burstPopups(20);
+        // 然后每2秒弹5个
+        intervalId = setInterval(() => {
+            burstPopups(5);
+        }, 2000);
+    }
+
+    // 画爱心（沿轨迹依次弹窗）
+    function drawHeart() {
+        if (heartIndex < heartPoints.length) {
+            const p = heartPoints[heartIndex];
+            const text = texts[Math.floor(Math.random() * texts.length)];
+            const color = colors[Math.floor(Math.random() * colors.length)];
+            // 让弹窗中心对准轨迹点
+            const width = text.length * 15 + 30;
+            createPopup(p.x - width/2, p.y - 25, text, color);
+            heartIndex++;
+            setTimeout(drawHeart, 40);
+        } else {
+            // 爱心画完了！
+            isHeartDone = true;
+            
+            // 显示大爱心
+            const heartDiv = document.getElementById('heartContainer');
+            heartDiv.style.opacity = '1';
+            const infoBar = document.getElementById('infoBar');
+            infoBar.innerHTML = '❤️ 爱心完成！开始满屏弹窗～ 点击卡片可关闭 ❤️';
+            
+            setTimeout(() => {
+                heartDiv.style.opacity = '0';
+            }, 2000);
+            
+            // 关键：开始随机弹窗
+            startFloating();
+        }
+    }
+
+    // 初始化
+    function init() {
+        heartPoints = calcHeartPoints();
+        console.log("心形点数：" + heartPoints.length);
+        drawHeart();
+    }
+
+    init();
+</script>
+</body>
+</html>
