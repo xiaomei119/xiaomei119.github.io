@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>生日快乐 - 蛋糕弹窗祝福</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: linear-gradient(135deg, #fbc2eb 0%, #a6c1ee 100%);
+            min-height: 100vh;
+            position: relative;
+            overflow-x: hidden;
+            font-family: "Microsoft YaHei", "微软雅黑", "PingFang SC", "Helvetica Neue", sans-serif;
+        }
+
+        /* 弹窗卡片样式 - 更温馨 */
+        .message-card {
+            position: fixed;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(2px);
+            border-radius: 30px;
+            padding: 12px 24px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+            font-size: 16px;
+            font-weight: bold;
+            z-index: 1000;
+            white-space: nowrap;
+            cursor: pointer;
+            animation: bounceIn 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+            border-left: 5px solid #ff9a9e;
+            transition: transform 0.2s;
+        }
+        .message-card:hover {
+            transform: scale(1.05) translateY(-5px);
+        }
+
+        @keyframes bounceIn {
+            0% { opacity: 0; transform: scale(0.3); }
+            50% { opacity: 1; transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        /* 蛋糕容器 (替代爱心) */
+        .cake-container {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 100px;
+            opacity: 0;
+            transition: opacity 1s ease, transform 0.5s ease;
+            pointer-events: none;
+            z-index: 999;
+            filter: drop-shadow(0 10px 15px rgba(0,0,0,0.2));
+            text-align: center;
+            line-height: 1;
+        }
+        /* 蛋糕装饰小星星 */
+        .cake-container::after {
+            content: "✨";
+            font-size: 40px;
+            position: absolute;
+            top: -30px;
+            right: -30px;
+            opacity: 0;
+            transition: opacity 0.5s;
+        }
+        .cake-container.show-star::after {
+            opacity: 1;
+        }
+
+        .info-bar {
+            position: fixed;
+            bottom: 20px;
+            left: 0;
+            right: 0;
+            text-align: center;
+            color: white;
+            font-size: 14px;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+            padding: 10px 20px;
+            border-radius: 40px;
+            width: fit-content;
+            margin: 0 auto;
+            z-index: 1001;
+            font-weight: 500;
+            letter-spacing: 1px;
+        }
+
+        /* 响应式调整 */
+        @media (max-width: 600px) {
+            .message-card {
+                padding: 8px 16px;
+                font-size: 13px;
+                white-space: nowrap;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="cake-container" id="cakeContainer">🎂</div>
+<div class="info-bar" id="infoBar">🎉 正在绘制生日蛋糕，把祝福送给你 🎉</div>
+
+<script>
+    // ================= 生日主题配置 =================
+    const birthdayTexts = [
+        "🎂 生日快乐！", "🎈 愿你所愿皆成真", "🌸 永远18岁", "🌟 天天开心", 
+        "💖 身体健康", "🍰 吃嘛嘛香", "📚 学业/事业进步", "✨ 好运爆棚", 
+        "🎁 收到好多礼物", "💐 被世界温柔以待", "🥳 今天你最靓", "❤️ 爱你的人都在身边",
+        "🌞 每一天都闪闪发光", "🍀 幸运常伴", "🎊 岁岁平安"
+    ];
+    const birthdayColors = [
+        "#FFC0CB", "#FFB6C1", "#FFA07A", "#FAF0E6", "#F0E68C", 
+        "#98FB98", "#AFEEEE", "#DDA0DD", "#FBCEB1", "#FFDAB9", 
+        "#E6E6FA", "#C0F0E8", "#FDD0F2", "#B0E0E6"
+    ];
+    
+    let currentPointIndex = 0;     // 当前绘制到的点索引
+    let cakePoints = [];            // 存储蛋糕形状的所有坐标点
+    let isCakeComplete = false;     // 蛋糕是否绘制完成
+    let floatInterval = null;       // 后续随机弹窗的定时器
+
+    // 随机数生成
+    function random(min, max) {
+        return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+
+    // ---------- 核心: 生成多层蛋糕的轮廓轨迹 ----------
+    // 为了让“画蛋糕”的过程有仪式感，我们生成一个围绕蛋糕外轮廓的点阵
+    // 包括底部大圆、中部圆、顶部圆以及蜡烛
+    function generateCakeOutlinePoints() {
+        const points = [];
+        const centerX = window.innerWidth / 2;
+        // 垂直中心稍微下移，让蛋糕看起来更稳
+        const baseY = window.innerHeight / 2 + 20;
+        
+        // 层高参数 (相对比例)
+        const layerHeights = [60, 45, 30];  // 底部、中部、顶部的高度
+        const layerRadius = [80, 60, 40];   // 各层半径
+        
+        // 1. 底层轮廓 (椭圆弧 + 底部弧线，这里简化成半圆+矩形感，但为了平滑，我们采样圆弧)
+        // 底部层: 围绕 (centerX, baseY - layerHeights[0]/2) 的半圆 + 底部直线，但我们生成一个闭合环
+        const bottomYCenter = baseY - layerHeights[0]/2;
+        // 底层上半圆弧 (180度 -> 0度，从左到右)
+        for (let ang = 180; ang <= 360; ang += 10) {
+            const rad = ang * Math.PI / 180;
+            const x = centerX + layerRadius[0] * Math.cos(rad);
+            const y = bottomYCenter + layerHeights[0]/2 * Math.sin(rad);
+            points.push({ x: Math.round(x), y: Math.round(y) });
+        }
+        // 底层下边沿 (从左到右)
+        for (let x = centerX - layerRadius[0]; x <= centerX + layerRadius[0]; x += 8) {
+            points.push({ x: Math.round(x), y: Math.round(baseY) });
+        }
+        
+        // 2. 中层轮廓 (在中层位置画一圈椭圆)
+        const midYCenter = baseY - layerHeights[0] - layerHeights[1]/2;
+        for (let ang = 0; ang <= 360; ang += 12) {
+            const rad = ang * Math.PI / 180;
+            const x = centerX + layerRadius[1] * Math.cos(rad);
+            const y = midYCenter + layerHeights[1]/2 * Math.sin(rad);
+            points.push({ x: Math.round(x), y: Math.round(y) });
+        }
+        
+        // 3. 顶层轮廓
+        const topYCenter = baseY - layerHeights[0] - layerHeights[1] - layerHeights[2]/2;
+        for (let ang = 0; ang <= 360; ang += 12) {
+            const rad = ang * Math.PI / 180;
+            const x = centerX + layerRadius[2] * Math.cos(rad);
+            const y = topYCenter + layerHeights[2]/2 * Math.sin(rad);
+            points.push({ x: Math.round(x), y: Math.round(y) });
+        }
+        
+        // 4. 蜡烛 (一个小长方形 + 火焰)
+        const candleX = centerX;
+        const candleBaseY = topYCenter - layerHeights[2]/2;
+        for (let h = 0; h <= 25; h += 4) {
+            points.push({ x: candleX - 5, y: candleBaseY - h });
+            points.push({ x: candleX + 5, y: candleBaseY - h });
+        }
+        // 火焰
+        points.push({ x: candleX, y: candleBaseY - 30 });
+        points.push({ x: candleX, y: candleBaseY - 28 });
+        
+        return points;
+    }
+    
+    // 更新点集 (窗口大小变化时重新生成，保证蛋糕居中)
+    function updatePoints() {
+        cakePoints = generateCakeOutlinePoints();
+        console.log("蛋糕轨迹点数：" + cakePoints.length);
+    }
+
+    // 创建一个弹窗 (生日风格)
+    function createPopup(x, y, text, bgColor) {
+        // 边界防出屏
+        const safeX = Math.min(Math.max(x, 15), window.innerWidth - 150);
+        const safeY = Math.min(Math.max(y, 20), window.innerHeight - 70);
+        
+        const popup = document.createElement('div');
+        popup.className = 'message-card';
+        popup.textContent = text;
+        popup.style.backgroundColor = bgColor;
+        popup.style.left = safeX + 'px';
+        popup.style.top = safeY + 'px';
+        
+        // 点击关闭
+        popup.addEventListener('click', function() {
+            popup.style.animation = 'fadeOut 0.2s forwards';
+            setTimeout(() => { if(popup.parentNode) popup.remove(); }, 200);
+        });
+        
+        document.body.appendChild(popup);
+        
+        // 3.5秒后自动消失
+        setTimeout(() => {
+            if(popup.parentNode) {
+                popup.style.animation = 'fadeOut 0.2s forwards';
+                setTimeout(() => popup.remove(), 200);
+            }
+        }, 3500);
+        
+        return popup;
+    }
+    
+    // 随机生成一个祝福弹窗（全屏任意位置）
+    function randomBirthdayPopup() {
+        const x = random(30, window.innerWidth - 150);
+        const y = random(40, window.innerHeight - 100);
+        const text = birthdayTexts[Math.floor(Math.random() * birthdayTexts.length)];
+        const color = birthdayColors[Math.floor(Math.random() * birthdayColors.length)];
+        createPopup(x, y, text, color);
+    }
+    
+    // 批量弹出
+    function burstPopups(count) {
+        console.log("🎉 弹出 " + count + " 个生日祝福");
+        for (let i = 0; i < count; i++) {
+            randomBirthdayPopup();
+        }
+    }
+    
+    // 开始全屏随机祝福 (无休止)
+    function startFullscreenBlessings() {
+        // 先密集来一波热闹气氛
+        burstPopups(24);
+        // 持续每2秒弹6个
+        floatInterval = setInterval(() => {
+            if (isCakeComplete) {
+                burstPopups(6);
+            }
+        }, 2000);
+    }
+    
+    // 沿蛋糕轮廓依次弹窗 (画蛋糕)
+    function drawCakeOutline() {
+        if (currentPointIndex < cakePoints.length) {
+            const p = cakePoints[currentPointIndex];
+            // 随机取祝福语和颜色
+            const text = birthdayTexts[Math.floor(Math.random() * birthdayTexts.length)];
+            const color = birthdayColors[Math.floor(Math.random() * birthdayColors.length)];
+            // 让弹窗中心指向轨迹点
+            const approxWidth = text.length * 14 + 30;
+            createPopup(p.x - approxWidth/2, p.y - 20, text, color);
+            currentPointIndex++;
+            setTimeout(drawCakeOutline, 38);  // 稍快一点，绘制过程更流畅
+        } else {
+            // 蛋糕轮廓绘制完成
+            isCakeComplete = true;
+            
+            // 显示大蛋糕和庆祝特效
+            const cakeDiv = document.getElementById('cakeContainer');
+            cakeDiv.style.opacity = '1';
+            cakeDiv.style.transform = 'translate(-50%, -50%) scale(1.2)';
+            cakeDiv.classList.add('show-star');
+            
+            const infoBar = document.getElementById('infoBar');
+            infoBar.innerHTML = '🎂 生日快乐！蛋糕完成啦！满屏祝福送给你 🎂 ✨ 点击卡片可关闭 ✨';
+            
+            // 添加一点烟花感觉的文字提示
+            setTimeout(() => {
+                cakeDiv.style.transform = 'translate(-50%, -50%) scale(1)';
+                cakeDiv.style.opacity = '0.8';
+                setTimeout(() => {
+                    cakeDiv.style.opacity = '0';
+                }, 1500);
+            }, 2000);
+            
+            // 开始全屏飘祝福
+            startFullscreenBlessings();
+        }
+    }
+    
+    // 窗口大小自适应：重新生成蛋糕轨迹 (如果蛋糕还没画完，重置绘制？为了体验，如果未完成则重置过程)
+    let resizeTimer;
+    function handleWindowResize() {
+        if (!isCakeComplete) {
+            // 为避免闪烁，延迟重新初始化轨迹并重新开始绘画
+            clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(() => {
+                // 保存当前是否在绘制中，若重置会丢失已有进度，但可重新开始绘制蛋糕（体验更好）
+                if (!isCakeComplete && cakePoints.length > 0) {
+                    // 重新生成坐标点
+                    updatePoints();
+                    // 重置索引并清除现有弹窗（避免错位），重新画蛋糕
+                    // 但为了不突然消失所有弹窗，仅重置绘制队列，不清除页面已有元素（体验连贯）
+                    currentPointIndex = 0;
+                    // 如果有之前的定时器递归，需要防止多个同时绘制，但setTimeout链不会叠加，这里需要停止旧的递归?
+                    // 由于递归调用setTimeout一直在跑，无法直接中断，用一个标志位控制旧流程
+                    // 简单处理：设置一个全局绘制id，但为了保险，我们重新启动一个新绘制前先取消旧的绘制意图。
+                    // 方法：在窗口变化后，让旧绘制停止，重新开始。
+                    // 为了代码清晰，增加一个取消标志。
+                    if (window.drawTimeoutId) clearTimeout(window.drawTimeoutId);
+                    // 重新调用绘制
+                    drawCakeOutline();
+                }
+            }, 200);
+        }
+    }
+    
+    // 包装原drawCakeOutline，支持取消旧绘制（防止resize导致双绘制）
+    let currentDrawTimeout = null;
+    function safeDrawCake() {
+        if (currentDrawTimeout) clearTimeout(currentDrawTimeout);
+        function step() {
+            if (currentPointIndex < cakePoints.length) {
+                const p = cakePoints[currentPointIndex];
+                const text = birthdayTexts[Math.floor(Math.random() * birthdayTexts.length)];
+                const color = birthdayColors[Math.floor(Math.random() * birthdayColors.length)];
+                const approxWidth = text.length * 14 + 30;
+                createPopup(p.x - approxWidth/2, p.y - 20, text, color);
+                currentPointIndex++;
+                currentDrawTimeout = setTimeout(step, 38);
+            } else {
+                if (!isCakeComplete) {
+                    isCakeComplete = true;
+                    const cakeDiv = document.getElementById('cakeContainer');
+                    cakeDiv.style.opacity = '1';
+                    cakeDiv.style.transform = 'translate(-50%, -50%) scale(1.2)';
+                    cakeDiv.classList.add('show-star');
+                    const infoBar = document.getElementById('infoBar');
+                    infoBar.innerHTML = '🎂 生日快乐！蛋糕完成啦！满屏祝福送给你 🎂 ✨ 点击卡片可关闭 ✨';
+                    setTimeout(() => {
+                        cakeDiv.style.transform = 'translate(-50%, -50%) scale(1)';
+                        cakeDiv.style.opacity = '0.8';
+                        setTimeout(() => { cakeDiv.style.opacity = '0'; }, 1500);
+                    }, 2000);
+                    startFullscreenBlessings();
+                }
+                currentDrawTimeout = null;
+            }
+        }
+        step();
+    }
+    
+    // 初始化
+    function init() {
+        updatePoints();        // 根据当前屏幕生成蛋糕轨迹点
+        currentPointIndex = 0;
+        isCakeComplete = false;
+        if (floatInterval) clearInterval(floatInterval);
+        // 清除旧绘制循环
+        if (currentDrawTimeout) clearTimeout(currentDrawTimeout);
+        safeDrawCake();
+        window.addEventListener('resize', () => {
+            if (!isCakeComplete) {
+                // 重置轨迹
+                updatePoints();
+                currentPointIndex = 0;
+                if (currentDrawTimeout) clearTimeout(currentDrawTimeout);
+                safeDrawCake();
+            }
+        });
+    }
+    
+    init();
+</script>
+</body>
+</html>
