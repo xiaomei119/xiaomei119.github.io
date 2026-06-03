@@ -62,7 +62,7 @@
         
         const sbDiv = document.createElement('div');
         sbDiv.className = 'sb-popup';
-        sbDiv.textContent = 'SB';
+        sbDiv.textContent = '麻花是SB';
         
         sbDiv.style.left = (x - 80) + 'px';
         sbDiv.style.top = (y - 55) + 'px';
