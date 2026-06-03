@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>点击弹出 SB</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+        }
+
+        body {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            cursor: pointer;
+            overflow: hidden;
+            font-family: "Impact", "Arial Black", sans-serif;
+        }
+
+        .sb-popup {
+            position: fixed;
+            background: linear-gradient(135deg, #ff0000, #ff6600);
+            color: white;
+            font-size: 70px;
+            font-weight: 900;
+            text-shadow: 5px 5px 0px rgba(0,0,0,0.5);
+            padding: 20px 45px;
+            border-radius: 60px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+            z-index: 10000;
+            white-space: nowrap;
+            cursor: pointer;
+            animation: sbFly 0.5s ease-out;
+            border: 4px solid white;
+            letter-spacing: 15px;
+        }
+
+        @keyframes sbFly {
+            0% {
+                opacity: 0;
+                transform: scale(0) rotate(-360deg);
+            }
+            60% {
+                opacity: 1;
+                transform: scale(1.3) rotate(10deg);
+            }
+            100% {
+                transform: scale(1) rotate(0deg);
+            }
+        }
+    </style>
+</head>
+<body>
+
+<script>
+    function showSB(event) {
+        const x = event.clientX;
+        const y = event.clientY;
+        
+        const sbDiv = document.createElement('div');
+        sbDiv.className = 'sb-popup';
+        sbDiv.textContent = 'SB';
+        
+        sbDiv.style.left = (x - 80) + 'px';
+        sbDiv.style.top = (y - 55) + 'px';
+        
+        sbDiv.addEventListener('click', function(e) {
+            e.stopPropagation();
+            sbDiv.remove();
+        });
+        
+        document.body.appendChild(sbDiv);
+        
+        setTimeout(() => {
+            if(sbDiv.parentNode) sbDiv.remove();
+        }, 2500);
+    }
+
+    document.body.addEventListener('click', showSB);
+</script>
+</body>
+</html>
